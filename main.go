@@ -14,7 +14,7 @@ var signingSecret string
 
 func main() {
 	r := gin.Default()
-	r.GET("/tally", home())
+	r.POST("/tally", home())
 
 	flag.StringVar(&signingSecret, "secret", "SIGNING_SECRET", "Your Slack app's signing secret")
 	flag.Parse()
