@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 var signingSecret string
@@ -16,7 +17,10 @@ func main() {
 	r := gin.Default()
 	r.POST("/tally", home())
 
-	flag.StringVar(&signingSecret, "secret", "SIGNING_SECRET", "Your Slack app's signing secret")
+	signingSecret = os.Getenv("SIGNING_SECRET")
+	if signingSecret == "" {
+		return
+	}
 	flag.Parse()
 
 	err := r.Run()
@@ -56,7 +60,10 @@ func home() gin.HandlerFunc {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			w.Write(b)
+			_, err = w.Write(b)
+			if err != nil {
+				return
+			}
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 			return
