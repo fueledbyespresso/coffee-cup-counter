@@ -1,13 +1,24 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"github.com/gin-gonic/gin"
+	"github.com/slack-go/slack"
+	"io"
+	"io/ioutil"
 	"net/http"
 )
 
+var signingSecret string
+
 func main() {
 	r := gin.Default()
-	r.GET("/home", home())
+	r.GET("/tally", home())
+
+	flag.StringVar(&signingSecret, "secret", "SIGNING_SECRET", "Your Slack app's signing secret")
+	flag.Parse()
+
 	err := r.Run()
 	if err != nil {
 		return
@@ -16,8 +27,39 @@ func main() {
 
 func home() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"test": "test",
-		})
+		w := c.Writer
+		r := c.Request
+		verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
+		s, err := slack.SlashCommandParse(r)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err = verifier.Ensure(); err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		switch s.Command {
+		case "/echo":
+			params := &slack.Msg{Text: s.Text}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(b)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 }
