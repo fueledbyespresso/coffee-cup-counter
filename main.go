@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/slack-go/slack"
 	"io"
@@ -35,6 +36,7 @@ func home() gin.HandlerFunc {
 		r := c.Request
 		verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
 		if err != nil {
+			fmt.Println("Step 1", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -42,29 +44,35 @@ func home() gin.HandlerFunc {
 		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
 		s, err := slack.SlashCommandParse(r)
 		if err != nil {
+			fmt.Println("Step 2", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		if err = verifier.Ensure(); err != nil {
+			fmt.Println("Step 3", err)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
 		switch s.Command {
-		case "/echo":
+		case "/tally":
+			fmt.Println("Tally case")
 			params := &slack.Msg{Text: s.Text}
 			b, err := json.Marshal(params)
 			if err != nil {
+				fmt.Println("Step 4", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, err = w.Write(b)
 			if err != nil {
+				fmt.Println("Step 4", err)
 				return
 			}
 		default:
+			fmt.Println("Default case")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
