@@ -8,7 +8,10 @@ import (
 func main() {
 	r := gin.Default()
 	r.GET("/home", home())
-	r.Run()
+	err := r.Run()
+	if err != nil {
+		return
+	}
 }
 
 func home() gin.HandlerFunc {
