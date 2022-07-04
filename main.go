@@ -1,111 +1,59 @@
 package main
 
 import (
+	"coffee-cup-counter/commands"
+	"coffee-cup-counter/database"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/slack-go/slack"
-	"io"
-	"io/ioutil"
+	"github.com/joho/godotenv"
 	"net/http"
 	"os"
 )
 
-var signingSecret string
-var scoreboard map[string]int
+//Load the environment variables from the projectvars.env file
+func initEnv() {
+	if _, err := os.Stat(".env"); err == nil {
+		err = godotenv.Load(".env")
+		if err != nil {
+			fmt.Println("Error loading environment.env")
+		}
+		fmt.Println("Current environment:", os.Getenv("ENV"))
+	}
+}
+
+//Force SSL in Heroku
+func forceSSL() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Header.Get("x-forwarded-proto") != "https" {
+			sslUrl := "https://" + c.Request.Host + c.Request.RequestURI
+			c.Redirect(http.StatusTemporaryRedirect, sslUrl)
+			return
+		}
+		c.Next()
+	}
+}
+
+func createServer(dbConnection *database.DB) *gin.Engine {
+	r := gin.Default()
+	//r.Use(gzip.Gzip(gzip.DefaultCompression))
+	if os.Getenv("ENV") != "DEV" {
+		r.Use(forceSSL())
+	}
+	r.POST("/tally", commands.VerifySlackRequest(), commands.Tally(dbConnection))
+	return r
+}
 
 func main() {
-	r := gin.Default()
-	r.POST("/tally", tally())
-	r.POST("/scoreboard", scores())
-
-	signingSecret = os.Getenv("SIGNING_SECRET")
-	if signingSecret == "" {
-		return
-	}
-	scoreboard = make(map[string]int)
+	initEnv()
+	database.PerformMigrations("file://database/migrations")
+	db := database.InitDBConnection()
+	defer db.Close()
+	// Run a background goroutine to clean up expired sessions from the database.
+	dbConnection := &database.DB{Db: db}
+	r := createServer(dbConnection)
 
 	err := r.Run()
 	if err != nil {
 		return
-	}
-}
-
-func tally() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		w := c.Writer
-		r := c.Request
-		verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
-		if err != nil {
-			fmt.Println("Step 1", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
-		s, err := slack.SlashCommandParse(r)
-		if err != nil {
-			fmt.Println("Step 2", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		if err = verifier.Ensure(); err != nil {
-			fmt.Println("Step 3", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		switch s.Command {
-		case "/tally":
-			fmt.Println("Tally case")
-			scoreboard[s.UserID]++
-			str := fmt.Sprintf("You had: %d", scoreboard[s.UserID])
-			params := &slack.Msg{Text: str}
-			c.JSON(200, params)
-		default:
-			fmt.Println("Incorrect command")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	}
-}
-
-func scores() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		w := c.Writer
-		r := c.Request
-		verifier, err := slack.NewSecretsVerifier(r.Header, signingSecret)
-		if err != nil {
-			fmt.Println("Step 1", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &verifier))
-		s, err := slack.SlashCommandParse(r)
-		if err != nil {
-			fmt.Println("Step 2", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		if err = verifier.Ensure(); err != nil {
-			fmt.Println("Step 3", err)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		switch s.Command {
-		case "/scoreboard":
-			fmt.Println("Scoreboard case")
-			str := fmt.Sprintf("You had: %d", scoreboard[s.UserID])
-
-			params := &slack.Msg{Text: str}
-			c.JSON(200, params)
-		default:
-			fmt.Println("Incorrect command")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
 	}
 }
