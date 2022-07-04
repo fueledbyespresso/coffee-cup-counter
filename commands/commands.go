@@ -41,6 +41,47 @@ func VerifySlackRequest() gin.HandlerFunc {
 	}
 }
 
+func JoinContest(dbConnection *database.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		sStr, exists := c.Get("SlackCommand")
+		if !exists {
+			c.AbortWithStatusJSON(500, "Could not verify Slack Request")
+			return
+		}
+
+		s := sStr.(slack.SlashCommand)
+		params := &slack.Msg{Text: s.Text}
+		c.JSON(200, params)
+	}
+}
+
+func ListMembers(dbConnection *database.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		sStr, exists := c.Get("SlackCommand")
+		if !exists {
+			c.AbortWithStatusJSON(500, "Could not verify Slack Request")
+			return
+		}
+		temp := slack.GetUsersInConversationParameters{
+			ChannelID: "Bot",
+			Cursor:    "",
+			Limit:     0,
+		}
+		conversation, _, err := slack.New(os.Getenv("BOT_TOKEN")).GetUsersInConversation(&temp)
+		if err != nil {
+			return
+		}
+
+		for i, s := range conversation {
+			fmt.Println(i, s)
+		}
+
+		s := sStr.(slack.SlashCommand)
+		params := &slack.Msg{Text: s.Text}
+		c.JSON(200, params)
+	}
+}
+
 func Tally(dbConnection *database.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sStr, exists := c.Get("SlackCommand")
@@ -49,16 +90,7 @@ func Tally(dbConnection *database.DB) gin.HandlerFunc {
 			return
 		}
 		s := sStr.(slack.SlashCommand)
-		switch s.Command {
-		case "/tally":
-			fmt.Println("Tally case")
-
-			params := &slack.Msg{Text: "TALLIED!"}
-			c.JSON(200, params)
-		default:
-			fmt.Println("Incorrect command")
-			c.AbortWithStatus(500)
-			return
-		}
+		params := &slack.Msg{Text: s.Text}
+		c.JSON(200, params)
 	}
 }

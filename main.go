@@ -40,6 +40,8 @@ func createServer(dbConnection *database.DB) *gin.Engine {
 		r.Use(forceSSL())
 	}
 	r.POST("/tally", commands.VerifySlackRequest(), commands.Tally(dbConnection))
+	r.POST("/members", commands.VerifySlackRequest(), commands.ListMembers(dbConnection))
+
 	return r
 }
 
