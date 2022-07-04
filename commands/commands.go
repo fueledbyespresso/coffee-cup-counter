@@ -62,8 +62,10 @@ func ListMembers(dbConnection *database.DB) gin.HandlerFunc {
 			c.AbortWithStatusJSON(500, "Could not verify Slack Request")
 			return
 		}
+		s := sStr.(slack.SlashCommand)
+
 		temp := slack.GetUsersInConversationParameters{
-			ChannelID: "Bot",
+			ChannelID: s.ChannelID,
 			Cursor:    "",
 			Limit:     0,
 		}
@@ -76,7 +78,6 @@ func ListMembers(dbConnection *database.DB) gin.HandlerFunc {
 			fmt.Println(i, s)
 		}
 
-		s := sStr.(slack.SlashCommand)
 		params := &slack.Msg{Text: s.Text}
 		c.JSON(200, params)
 	}
