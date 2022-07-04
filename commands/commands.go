@@ -99,7 +99,7 @@ func Tally(db *database.DB) gin.HandlerFunc {
 			return
 		}
 		s := sStr.(slack.SlashCommand)
-		_, err := db.Db.Query(`INSERT INTO tally (contestant) VALUES ($1) returning count(contestant)`, s.UserID)
+		_, err := db.Db.Query(`INSERT INTO tally (contestant) VALUES ($1)`, s.UserID)
 		if err != nil {
 			c.AbortWithStatusJSON(500, &slack.Msg{Text: "Cannot tally!"})
 			return
