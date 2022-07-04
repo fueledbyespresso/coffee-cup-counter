@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 func VerifySlackRequest() gin.HandlerFunc {
@@ -90,7 +91,7 @@ func ListMembers(dbConnection *database.DB) gin.HandlerFunc {
 	}
 }
 
-func Tally(dbConnection *database.DB) gin.HandlerFunc {
+func Tally(db *database.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sStr, exists := c.Get("SlackCommand")
 		if !exists {
@@ -98,7 +99,22 @@ func Tally(dbConnection *database.DB) gin.HandlerFunc {
 			return
 		}
 		s := sStr.(slack.SlashCommand)
-		params := &slack.Msg{Text: s.Text}
+		_, err := db.Db.Query(`INSERT INTO tally (contestant) VALUES ($1) returning count(contestant)`, s.UserID)
+		if err != nil {
+			c.AbortWithStatusJSON(500, &slack.Msg{Text: "Cannot tally!"})
+			return
+		}
+
+		row := db.Db.QueryRow(`SELECT count() FROM tally WHERE contestant=$1`, s.UserID)
+		tally := 0
+		if row.Err() != nil {
+			c.AbortWithStatusJSON(500, &slack.Msg{Text: "Cannot display tally!"})
+			return
+		}
+
+		err = row.Scan(&tally)
+
+		params := &slack.Msg{Text: strconv.Itoa(tally)}
 		c.JSON(200, params)
 	}
 }
