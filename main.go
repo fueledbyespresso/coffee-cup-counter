@@ -39,8 +39,10 @@ func createServer(dbConnection *database.DB) *gin.Engine {
 	if os.Getenv("ENV") != "DEV" {
 		r.Use(forceSSL())
 	}
+	r.POST("/join", commands.VerifySlackRequest(), commands.JoinContest(dbConnection))
 	r.POST("/tally", commands.VerifySlackRequest(), commands.Tally(dbConnection))
 	r.POST("/members", commands.VerifySlackRequest(), commands.ListMembers(dbConnection))
+	r.POST("/scoreboard", commands.VerifySlackRequest(), commands.Scoreboard(dbConnection))
 
 	return r
 }

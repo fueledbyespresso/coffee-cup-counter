@@ -41,16 +41,23 @@ func VerifySlackRequest() gin.HandlerFunc {
 	}
 }
 
-func JoinContest(dbConnection *database.DB) gin.HandlerFunc {
+func JoinContest(db *database.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sStr, exists := c.Get("SlackCommand")
 		if !exists {
 			c.AbortWithStatusJSON(500, "Could not verify Slack Request")
 			return
 		}
-
 		s := sStr.(slack.SlashCommand)
-		params := &slack.Msg{Text: s.Text}
+
+		row := db.Db.QueryRow(`INSERT INTO contestant (username, user_id) 
+									 	VALUES ($1, $2) on conflict do nothing`, s.UserName, s.UserID)
+		if row.Err() != nil {
+			c.AbortWithStatusJSON(400, "Invalid parameters.")
+			return
+		}
+
+		params := &slack.Msg{Text: "You have joined the contest! If you were already in the competition, nothing changed."}
 		c.JSON(200, params)
 	}
 }
@@ -92,6 +99,32 @@ func Tally(dbConnection *database.DB) gin.HandlerFunc {
 		}
 		s := sStr.(slack.SlashCommand)
 		params := &slack.Msg{Text: s.Text}
+		c.JSON(200, params)
+	}
+}
+
+func Scoreboard(db *database.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		rows, err := db.Db.Query(`SELECT username, count(username) FROM tally 
+    									JOIN contestant c on c.user_id = tally.contestant 
+                                 		group by username`)
+		if err != nil {
+			c.AbortWithStatusJSON(500, &slack.Msg{Text: "Cannot display scoreboard!"})
+			return
+		}
+		scoreboardStr := ""
+		for rows.Next() {
+			var contestant string
+			var count int
+			err = rows.Scan(&contestant, &count)
+			if err != nil {
+				c.AbortWithStatusJSON(500, &slack.Msg{Text: "Error retrieving drink tallies."})
+				return
+			}
+
+			scoreboardStr += fmt.Sprintf("%s drank %d drinks\n", contestant, count)
+		}
+		params := &slack.Msg{Text: scoreboardStr}
 		c.JSON(200, params)
 	}
 }

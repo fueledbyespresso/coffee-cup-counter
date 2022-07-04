@@ -1,0 +1,9 @@
+INSERT INTO drink (name) values ('drip');
+INSERT INTO drink (name) values ('mocha');
+INSERT INTO drink (name) values ('latte');
+INSERT INTO drink (name) values ('espresso');
+INSERT INTO drink (name) values ('ristretto');
+INSERT INTO drink (name) values ('cappuccino');
+INSERT INTO drink (name) values ('pour-over');
+INSERT INTO drink (name) values ('americano');
+INSERT INTO drink (name) values ('affogato');
