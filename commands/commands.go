@@ -105,7 +105,7 @@ func Tally(db *database.DB) gin.HandlerFunc {
 			return
 		}
 
-		row := db.Db.QueryRow(`SELECT count() FROM tally WHERE contestant=$1`, s.UserID)
+		row := db.Db.QueryRow(`SELECT count(*) FROM tally WHERE contestant=$1`, s.UserID)
 		tally := 0
 		if row.Err() != nil {
 			c.AbortWithStatusJSON(500, &slack.Msg{Text: "Cannot display tally!"})
